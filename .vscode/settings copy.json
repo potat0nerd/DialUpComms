@@ -1,0 +1,56 @@
+{
+  "Lua.runtime.version": "Lua 5.1",
+  "Lua.runtime.builtin": {
+    "basic": "disable",
+    "debug": "disable",
+    "io": "disable",
+    "math": "disable",
+    "os": "disable",
+    "package": "disable",
+    "string": "disable",
+    "table": "disable",
+    "utf8": "disable"
+  },
+  "Lua.workspace.library": [
+    "~\\.vscode\\extensions\\ketho.wow-api-0.22.2\\Annotations\\Core",
+    "~\\.vscode\\extensions\\ketho.wow-api-0.22.2\\Annotations\\FrameXML"
+  ],
+  "Lua.workspace.ignoreDir": ["libs", ".luacheckrc", ".github", ".vscode"],
+
+  "Lua.format.defaultConfig": {
+    "indent_style": "tab",
+    "indent_size": "2",
+    "continuation_indent": "4",
+    "end_statement_with_semicolon": "always",
+    "quote_style": "single",
+    "call_arg_parentheses": "always",
+    "max_line_length": "255",
+    "end_of_line": "auto",
+    "trailing_table_separator": "always",
+    "insert_final_newline": "true",
+    "space_around_table_field_list": "false",
+    "space_before_attribute": "true",
+    "space_before_function_open_parenthesis": "false",
+    "space_before_function_call_open_parenthesis": "false",
+    "space_before_closure_open_parenthesis": "false",
+    "space_before_function_call_single_arg": "true",
+    "space_before_open_square_bracket": "false",
+    "space_inside_function_call_parentheses": "false",
+    "space_inside_function_param_list_parentheses": "false",
+    "space_inside_square_brackets": "false",
+    "space_around_table_append_operator": "true",
+    "ignore_spaces_inside_function_call": "false",
+    "space_before_inline_comment": "true",
+    "space_around_math_operator": "true",
+    "space_after_comma": "true",
+    "space_after_comma_in_for_statement": "true",
+    "space_around_concat_operator": "true",
+    "align_call_args": "true",
+    "align_function_params": "true",
+    "align_continuous_assign_statement": "true",
+    "align_continuous_rect_table_field": "true",
+    "align_if_branch": "true",
+    "align_array_table": "true"
+  },
+  "Lua.diagnostics.globals": ["ENERGY", "CHI", "RUNIC_POWER"]
+}
