@@ -256,7 +256,7 @@ function DialUpComms.AddNewPart(ID, partNumber, message)
     pack.partTable[partNumber] = message;
 
 
-    if #pack.partTable ~= pack.parts then return; end; --doing # apparently cheats and don't check for missing pieces
+    if #pack.partTable ~= pack.parts then return; end; --doing '#'' apparently cheats and don't check for missing pieces
     local firstMissingPiece = DialUpComms.GetFirstMissingPiece(pack);
     if firstMissingPiece then
         DialUpComms.SendResponsePacket(pack);
@@ -335,15 +335,6 @@ function DialUpComms.getNextPrefixIndexForChannel(channel)
     local prefixIndex = index % count + 1;
     return prefixIndex;
 end;
-
---send packet with prefix and size, maybe a hash?
---reciever sends confirmation back (if prefix is registered)
---send the thingy
---on last piece recieved, send a confirmation packet if completed, or a list of the missing pieces if incomplete
---should all clients periodically send comms to prove that they're awake?
-
-
-
 
 function DialUpComms.init()
     DialUpComms.setupQueues();
@@ -433,7 +424,7 @@ function DialUpComms:SendOrQueueMessage(prefix, message, channel, target, priori
 end;
 
 function DialUpComms.GetBNETGameIDForTarget(target)
-    --yea
+    --TODO add this
 end;
 
 function DialUpComms.CanSendToTargetViaBNET(target)
@@ -452,8 +443,6 @@ function DialUpComms.CanSendToTargetViaBNET(target)
                 end;
             end;
         end;
-
-        --C_BattleNet.SendGameData(gameAccountID, prefix, data);
     end;
 end;
 
@@ -500,7 +489,7 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
 
 
 
-    local headerMessage = string.format('%s%s%s:%s', messageID, partsEncoded, prefix, partToSendWithHeader); --anything else we'd like to include here?
+    local headerMessage = string.format('%s%s%s:%s', messageID, partsEncoded, prefix, partToSendWithHeader);
     DialUpComms:SendOrQueueMessage(DialUpComms.HeaderPrefix, headerMessage, channel, target, 'ALERT', callbackFunction, callbackArgument, bytesSent, totalMessageLength);
 
 
@@ -535,14 +524,13 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
 end;
 
 function DialUpComms.setupQueues()
-    if not DialUpComms.queues then
-        DialUpComms.timers = {};
-        DialUpComms.queues = {};
-        for i, queueName in ipairs(DialUpComms.queueTypes) do
-            DialUpComms.queues[queueName] = {};
-            for limitGroup in pairs(DialUpComms.commLimits) do
-                DialUpComms.queues[queueName][limitGroup] = {};
-            end;
+    if DialUpComms.queues then return; end;
+    DialUpComms.timers = {};
+    DialUpComms.queues = {};
+    for i, queueName in ipairs(DialUpComms.queueTypes) do
+        DialUpComms.queues[queueName] = {};
+        for limitGroup in pairs(DialUpComms.commLimits) do
+            DialUpComms.queues[queueName][limitGroup] = {};
         end;
     end;
 end;
@@ -574,7 +562,6 @@ function DialUpComms:DecodeNumber(number)
 
     for i = 1, #number do
         local char = number:sub(i, i);
-        --local value = string.byte(char);
         local value = DialUpComms.strbyte[char];
 
         result = result * 254 + value;
@@ -588,7 +575,6 @@ function DialUpComms:EncodeNumber(number)
 
     while number > 0 do
         local remainder = number % 254;
-        --local symbol = string.char(remainder);
         local symbol = DialUpComms.strchar[remainder];
         ret = symbol .. ret;
         number = math.floor(number / 254);
@@ -616,5 +602,3 @@ end;
 function DialUpComms.AddonCommsCurrentlyAllowed()
     return not DialUpComms.ChatIsRestricted;
 end;
-
-_G.DialUpComms = DialUpComms;
