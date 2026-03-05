@@ -22,12 +22,12 @@ DialUpComms.PartNumberMessageLength = 2;
 DialUpComms.HeaderPrefix = 'DUC_HEADER';
 DialUpComms.ResponsePrefix = 'DUC_RESPONSE';
 
-DialUpComms.Retries = 60;
-DialUpComms.RetryInerval = 10;
+DialUpComms.Retries = 10;
+DialUpComms.RetryInerval = 60;
 
 DialUpComms.commLimits = {
     ['GUILD'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
-    ['WHISPER'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 10, reset = 10,}, messageLength = 255,},
+    ['WHISPER'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
     ['BNET'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 4090,},
     ['GROUP'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
 };
@@ -63,10 +63,12 @@ local function registerPrefixes()
     end;
 
     for i = 1, prefixesToRegister do
-        local result = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.Prefix .. i);
-        if result == Enum.RegisterAddonMessagePrefixResult.MaxPrefixes then
+        local result1 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.Prefix .. i);
+        local result2 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.HeaderPrefix .. i);
+        local result3 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.ResponsePrefix .. i);
+        if result3 == Enum.RegisterAddonMessagePrefixResult.MaxPrefixes then
             --print(DialUpComms, 'bailed early when registering prefixes', i - 1, prefixesToRegister);
-            prefixesToRegister = i - 1;
+            prefixesToRegister = i - 3;
             break;
         end;
     end;
@@ -127,8 +129,8 @@ function DialUpComms.HookAddonMessages()
 end;
 
 function DialUpComms.isHeaderOrResponsePrefix(prefix)
-    if DialUpComms.HeaderPrefix == prefix then return true; end;
-    if DialUpComms.ResponsePrefix == prefix then return true; end;
+    if DialUpComms.HeaderPrefix == string.sub(prefix, 1, #DialUpComms.HeaderPrefix) then return true; end;
+    if DialUpComms.ResponsePrefix == string.sub(prefix, 1, #DialUpComms.ResponsePrefix) then return true; end;
     return false;
 end;
 
@@ -231,11 +233,17 @@ function DialUpComms.SendResponsePacket(packet)
     if channel == 'WHISPER' and DialUpComms.CanSendToTargetViaBNET(packet.sender) then
         --channel = "BNET"
     end;
-    local prio = 'ALERT'; --TODO should probably be bulk
     local id = packet.id;
     local firstMissingPiece = DialUpComms.GetFirstMissingPiece(packet);
-    firstMissingPiece = firstMissingPiece and firstMissingPiece - 1;
-    local partsCollected = firstMissingPiece or packet.parts;
+
+    local partsCollected = firstMissingPiece and firstMissingPiece - 1 or packet.parts;
+
+    local prio = 'BULK';
+
+    if partsCollected == 0 and packet.parts ~= 1 then
+        prio = 'ALERT'; -- prio initial presponse i multi message situations
+    end;
+
     local partsCollectedEncoded = DialUpComms:EncodeParts(partsCollected);
 
     DialUpComms:SendOrQueueMessage(DialUpComms.ResponsePrefix, string.format('%s%s', id, partsCollectedEncoded), channel, packet.sender, prio);
@@ -357,6 +365,8 @@ end;
 function DialUpComms.SendMessageInternal(prefix, message, channel, target, callbackFunction, callbackArgument, arg2, arg3)
     if not DialUpComms.isHeaderOrResponsePrefix(prefix) then
         prefix = DialUpComms.Prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
+    else
+        prefix = prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     end;
     local response = C_ChatInfo.SendAddonMessage(prefix, message, channel, target);
     if response ~= 0 then
@@ -486,11 +496,12 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
     local partsEncoded = DialUpComms:EncodeParts(parts);
     assert(#partsEncoded <= DialUpComms.PartNumberMessageLength, 'Message is too long');
 
+    local headerPrio = parts == 1 and priority or 'ALERT';
 
 
 
     local headerMessage = string.format('%s%s%s:%s', messageID, partsEncoded, prefix, partToSendWithHeader);
-    DialUpComms:SendOrQueueMessage(DialUpComms.HeaderPrefix, headerMessage, channel, target, 'ALERT', callbackFunction, callbackArgument, bytesSent, totalMessageLength);
+    DialUpComms:SendOrQueueMessage(DialUpComms.HeaderPrefix, headerMessage, channel, target, headerPrio, callbackFunction, callbackArgument, bytesSent, totalMessageLength);
 
 
 
