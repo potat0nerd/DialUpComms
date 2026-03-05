@@ -447,8 +447,8 @@ function DialUpComms.CanSendToTargetViaBNET(target)
                 local name = accountInfo.characterName;
                 if name then
                     if target == name then return true; end;
-                    local realm = accountInfo.realmName;
-                    local realmIncludedName = string.format('%s-%s', name, realm or GetNormalizedRealmName());
+                    local realm = accountInfo.realmName or GetNormalizedRealmName() or '';
+                    local realmIncludedName = string.format('%s-%s', name, realm);
                     if target == realmIncludedName then return true; end;
                 end;
             end;
