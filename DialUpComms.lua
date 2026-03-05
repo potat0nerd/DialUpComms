@@ -159,7 +159,7 @@ local function onEvent(self, event, prefix, message, channel, sender)
     if event == 'CHAT_MSG_ADDON' then
         if not DialUpComms.isDUCPrefix(prefix) then return; end;
         sender = Ambiguate(sender, 'none');
-        if prefix == DialUpComms.HeaderPrefix then
+        if DialUpComms.HeaderPrefix == string.sub(prefix, 1, #DialUpComms.HeaderPrefix) then
             local messageID = string.sub(message, 1, DialUpComms.MessageIdLength);
             local numParts = string.sub(message, DialUpComms.MessageIdLength + 1, DialUpComms.MessageIdLength + DialUpComms.PartNumberMessageLength);
             local realPrefix = string.sub(message, DialUpComms.MessageIdLength + DialUpComms.PartNumberMessageLength + 1, string.find(message, ':') - 1);
@@ -168,7 +168,7 @@ local function onEvent(self, event, prefix, message, channel, sender)
 
             DialUpComms.PrepIncomingPackage(realPrefix, DialUpComms:DecodeNumber(numParts), messageID, sender, channel);
             DialUpComms.AddNewPart(messageID, 1, firstMessagePart);
-        elseif prefix == DialUpComms.ResponsePrefix then
+        elseif DialUpComms.ResponsePrefix == string.sub(prefix, 1, #DialUpComms.ResponsePrefix) then
             local messageID = string.sub(message, 1, DialUpComms.MessageIdLength);
 
             local packetInfo = DialUpComms.OutgoingPackages[messageID];
