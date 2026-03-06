@@ -438,7 +438,8 @@ function DialUpComms.GetBNETGameIDForTarget(target)
 end;
 
 function DialUpComms.CanSendToTargetViaBNET(target)
-    local myRealm = GetNormalizedRealmName() or '';
+    local myRealm = GetNormalizedRealmName();
+    if not myRealm then return; end;
     for i = 0, BNGetNumFriends() do
         local accIndexes = C_BattleNet.GetFriendNumGameAccounts(i);
         for j = 1, accIndexes do
