@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 1;
+local MINOR = 2;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -22,13 +22,16 @@ DialUpComms.PartNumberMessageLength = 2;
 DialUpComms.HeaderPrefix = 'DUC_HEADER';
 DialUpComms.ResponsePrefix = 'DUC_RESPONSE';
 
-DialUpComms.Retries = 10;
-DialUpComms.RetryInerval = 60;
+DialUpComms.Retries = 5;
+DialUpComms.RetryInerval = 120;
+
+
+DialUpComms.GlobalCommLimit = {budget = 100, reset = 5,};
 
 DialUpComms.commLimits = {
     ['GUILD'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
-    ['WHISPER'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
-    ['BNET'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 4090,},
+    ['WHISPER'] = {total = {budget = 50, reset = 5,}, messageLength = 255,},
+    ['BNET'] = {total = {budget = 50, reset = 5,}, messageLength = 4090,},
     ['GROUP'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
 };
 
@@ -45,23 +48,26 @@ local function registerPrefixes()
     C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.HeaderPrefix);
     C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.ResponsePrefix);
     local prefixesToRegister = 0;
+
+    DialUpComms.channelCooldowns['GLOBAL'] = {index = 1,};
+
     for channel, channelLimits in pairs(DialUpComms.commLimits) do
         DialUpComms.channelCooldowns[channel] = {index = 1,};
-        local channelBudget = channelLimits.total.budget;
-        local channelReset = channelLimits.total.reset;
+        if channelLimits.prefix then
+            local channelBudget = channelLimits.total.budget;
+            local channelReset = channelLimits.total.reset;
 
-        local prefixBudget = channelLimits.prefix.budget;
-        local prefixReset = channelLimits.prefix.reset;
 
-        local channelCommsPerSec = channelReset / channelBudget;
-        local prefixCommsPerSec = prefixReset / prefixBudget;
 
-        local prefixesRequired = math.ceil(prefixCommsPerSec / channelCommsPerSec);
-        if prefixesRequired > prefixesToRegister then
-            prefixesToRegister = prefixesRequired;
+            local prefixBudget = channelLimits.prefix.budget;
+            local prefixReset = channelLimits.prefix.reset;
+            local channelCommsPerSec = channelReset / channelBudget;
+            local prefixCommsPerSec = prefixReset / prefixBudget;
+            local additionalPrefixesRequired = math.ceil(prefixCommsPerSec / channelCommsPerSec);
+            prefixesToRegister = prefixesToRegister + additionalPrefixesRequired;
         end;
     end;
-
+    prefixesToRegister = max(prefixesToRegister, 1);
     for i = 1, prefixesToRegister do
         local result1 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.Prefix .. i);
         local result2 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.HeaderPrefix .. i);
@@ -82,11 +88,20 @@ function DialUpComms.OnMessageSent(prefix, channel, response, message)
     end;
     local limitType = DialUpComms.sharedLimits[channel] or channel;
     local cdTable = DialUpComms.channelCooldowns[limitType];
-    if not cdTable then return; end; --no cd for this channel?
-    cdTable[cdTable.index] = GetTime();
+    --if not cdTable then return; end; --no cd for this channel?
+    local now = GetTime();
+    cdTable[cdTable.index] = now;
     cdTable.index = cdTable.index + 1;
     if cdTable.index > DialUpComms.commLimits[limitType].total.budget then
         cdTable.index = 1;
+    end;
+
+    local globalCDTable = DialUpComms.channelCooldowns['GLOBAL'];
+    local globalIndex = globalCDTable.index;
+    globalCDTable[globalIndex] = now;
+    globalCDTable.index = globalIndex + 1;
+    if globalCDTable.index > DialUpComms.GlobalCommLimit.budget then
+        globalCDTable.index = 1;
     end;
 end;
 
@@ -245,7 +260,8 @@ function DialUpComms.SendResponsePacket(packet)
     end;
 
     local partsCollectedEncoded = DialUpComms:EncodeParts(partsCollected);
-
+    local fullMessage = string.format('%s%s', id, partsCollectedEncoded);
+    if DialUpComms.doesMessageExistInQueue(fullMessage, channel, packet.sender) then return; end;
     DialUpComms:SendOrQueueMessage(DialUpComms.ResponsePrefix, string.format('%s%s', id, partsCollectedEncoded), channel, packet.sender, prio);
 end;
 
@@ -326,13 +342,21 @@ function DialUpComms.getGlobalCDForChannel(channel)
     return totalCooldown + totalReset;
 end;
 
+function DialUpComms.getGlobalCD()
+    local cdTable = DialUpComms.channelCooldowns['GLOBAL'];
+    local totalIndex = cdTable.index;
+    local totalCooldown = cdTable[totalIndex] or 0;
+    local totalReset = DialUpComms.GlobalCommLimit.reset;
+    return totalCooldown + totalReset;
+end;
+
 function DialUpComms.canSendMessageInChannel(channel)
     if not DialUpComms.AddonCommsCurrentlyAllowed() then return false; end;
     if not DialUpComms.CommsAreHooked then return false; end;
     local cd = DialUpComms.getGlobalCDForChannel(channel);
-    if not cd then return true; end;
+    local globalCD = DialUpComms.getGlobalCD();
     local now = GetTime();
-    return cd <= now;
+    return cd < now and globalCD < now;
 end;
 
 function DialUpComms.getNextPrefixIndexForChannel(channel)
@@ -400,7 +424,7 @@ function DialUpComms.ScheduleUpdate(channel)
     if not DialUpComms.AddonCommsCurrentlyAllowed() then return false; end;
     if not DialUpComms.CommsAreHooked then return false; end;
     if DialUpComms.timers[channel] then return; end;
-    local channelAvailableTime = DialUpComms.getGlobalCDForChannel(channel);
+    local channelAvailableTime = math.max(DialUpComms.getGlobalCDForChannel(channel), DialUpComms.getGlobalCD());
     local now = GetTime();
     local timeUntilAvailable = channelAvailableTime - now;
     DialUpComms.timers[channel] = C_Timer.NewTimer(timeUntilAvailable, function()
@@ -518,6 +542,13 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
         parts = parts,
         statusCallback = statusCallback,
     };
+
+    C_Timer.After(
+        DialUpComms.RetryInerval * (DialUpComms.Retries + 1),
+        function()
+            DialUpComms.OutgoingPackages[messageID] = nil;
+        end
+    );
 
 
     local cursor = 0;
