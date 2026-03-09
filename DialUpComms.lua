@@ -243,9 +243,13 @@ local function onEvent(self, event, prefix, message, channel, sender)
     end;
 end;
 
+
+
 function DialUpComms.SendResponsePacket(packet)
+    if DialUpComms.UnitIsPlayer(packet.sender) then return; end;
+
     local channel = 'WHISPER';
-    if channel == 'WHISPER' and DialUpComms.CanSendToTargetViaBNET(packet.sender) then
+    if DialUpComms.CanSendToTargetViaBNET(packet.sender) then
         --channel = "BNET"
     end;
     local id = packet.id;
@@ -261,6 +265,7 @@ function DialUpComms.SendResponsePacket(packet)
 
     local partsCollectedEncoded = DialUpComms:EncodeParts(partsCollected);
     local fullMessage = string.format('%s%s', id, partsCollectedEncoded);
+
     if DialUpComms.doesMessageExistInQueue(fullMessage, channel, packet.sender) then return; end;
     DialUpComms:SendOrQueueMessage(DialUpComms.ResponsePrefix, string.format('%s%s', id, partsCollectedEncoded), channel, packet.sender, prio);
 end;
@@ -644,4 +649,9 @@ end;
 
 function DialUpComms.AddonCommsCurrentlyAllowed()
     return not DialUpComms.ChatIsRestricted;
+end;
+
+function DialUpComms.UnitIsPlayer(name)
+    name = Ambiguate(name, 'none');
+    return UnitIsUnit(name, 'player');
 end;
