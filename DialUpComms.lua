@@ -86,7 +86,7 @@ function DialUpComms.OnMessageSent(prefix, channel, response, message)
     if response and response ~= Enum.SendAddonMessageResult.Success then
         return;
     end;
-    local limitType = DialUpComms.sharedLimits[channel] or channel;
+    local limitType = DialUpComms.sharedLimits[channel] or channel or 'GROUP';
     local cdTable = DialUpComms.channelCooldowns[limitType];
     --if not cdTable then return; end; --no cd for this channel?
     local now = GetTime();
