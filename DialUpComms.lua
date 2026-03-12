@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 2;
+local MINOR = 3;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -10,7 +10,7 @@ DialUpComms.OutgoingPackages = {};
 DialUpComms.internallyRegisteredPrefixes = DialUpComms.internallyRegisteredPrefixes or {};
 
 DialUpComms.queueTypes = {
-    'ALERT', 'NORMAL', 'BULK',
+    'URGENT', 'ALERT', 'NORMAL', 'BULK',
 };
 
 DialUpComms.prefixCount = 0;
@@ -260,7 +260,7 @@ function DialUpComms.SendResponsePacket(packet)
     local prio = 'BULK';
 
     if partsCollected == 0 and packet.parts ~= 1 then
-        prio = 'ALERT'; -- prio initial presponse i multi message situations
+        prio = 'URGENT'; -- prio initial presponse i multi message situations
     end;
 
     local partsCollectedEncoded = DialUpComms:EncodeParts(partsCollected);
@@ -391,19 +391,22 @@ function DialUpComms.getMaxMessageLengthForChannel(channel)
     return DialUpComms.commLimits[channel].messageLength;
 end;
 
-function DialUpComms.SendMessageInternal(prefix, message, channel, target, callbackFunction, callbackArgument, arg2, arg3)
+function DialUpComms.SendMessageInternal(prefix, message, channel, target, callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend)
     if not DialUpComms.isHeaderOrResponsePrefix(prefix) then
         prefix = DialUpComms.Prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     else
         prefix = prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     end;
     local response = C_ChatInfo.SendAddonMessage(prefix, message, channel, target);
-    if response ~= 0 then
+    if response ~= Enum.SendAddonMessageResult.Success then
+        if response == Enum.SendAddonMessageResult.GeneralError then --retry asap
+            DialUpComms:SendOrQueueMessage(prefix, message, channel, target, 'URGENT', callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
+        end;
         --print('response: ', response);
         return;
     end;
     if callbackFunction then
-        securecallfunction(callbackFunction, callbackArgument, arg2, arg3);
+        securecallfunction(callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
     end;
 end;
 
@@ -572,13 +575,12 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
 end;
 
 function DialUpComms.setupQueues()
-    if DialUpComms.queues then return; end;
-    DialUpComms.timers = {};
-    DialUpComms.queues = {};
+    DialUpComms.timers = DialUpComms.timers or {};
+    DialUpComms.queues = DialUpComms.queues or {};
     for i, queueName in ipairs(DialUpComms.queueTypes) do
-        DialUpComms.queues[queueName] = {};
+        DialUpComms.queues[queueName] = DialUpComms.queues[queueName] or {};
         for limitGroup in pairs(DialUpComms.commLimits) do
-            DialUpComms.queues[queueName][limitGroup] = {};
+            DialUpComms.queues[queueName][limitGroup] = DialUpComms.queues[queueName][limitGroup] or {};
         end;
     end;
 end;
