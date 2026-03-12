@@ -1,2 +1,2 @@
 # DialUpComms
-Yet another Comms lib
+Modern multi-prefix, multi-realm comms lib
