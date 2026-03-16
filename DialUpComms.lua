@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 3;
+local MINOR = 4;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -391,16 +391,17 @@ function DialUpComms.getMaxMessageLengthForChannel(channel)
     return DialUpComms.commLimits[channel].messageLength;
 end;
 
-function DialUpComms.SendMessageInternal(prefix, message, channel, target, callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend)
-    if not DialUpComms.isHeaderOrResponsePrefix(prefix) then
+function DialUpComms.SendMessageInternal(incomingPrefix, message, channel, target, callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend)
+    local prefix
+    if not DialUpComms.isHeaderOrResponsePrefix(incomingPrefix) then
         prefix = DialUpComms.Prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     else
-        prefix = prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
+        prefix = incomingPrefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     end;
     local response = C_ChatInfo.SendAddonMessage(prefix, message, channel, target);
     if response ~= Enum.SendAddonMessageResult.Success then
         if response == Enum.SendAddonMessageResult.GeneralError then --retry asap
-            DialUpComms:SendOrQueueMessage(prefix, message, channel, target, 'URGENT', callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
+            DialUpComms:SendOrQueueMessage(incomingPrefix, message, channel, target, 'URGENT', callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
         end;
         --print('response: ', response);
         return;
