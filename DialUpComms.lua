@@ -30,8 +30,8 @@ DialUpComms.GlobalCommLimit = {budget = 100, reset = 5,};
 
 DialUpComms.commLimits = {
     ['GUILD'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
-    ['WHISPER'] = {total = {budget = 50, reset = 5,}, messageLength = 255,},
-    ['BNET'] = {total = {budget = 50, reset = 5,}, messageLength = 4090,},
+    ['WHISPER'] = {total = {budget = 100, reset = 5,}, messageLength = 255,},
+    ['BNET'] = {total = {budget = 100, reset = 5,}, messageLength = 4090,},
     ['GROUP'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
 };
 
@@ -43,6 +43,12 @@ DialUpComms.sharedLimits = {
 
 DialUpComms.ChatIsRestricted = false;
 
+DialUpComms.debug = false;
+
+local function debugPrint(...)
+    if not DialUpComms.debug then return; end;
+    print('|c' .. 'FF00d111' .. 'DialUpComms|r:', tostringall(...));
+end;
 
 local function registerPrefixes()
     C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.HeaderPrefix);
@@ -73,12 +79,13 @@ local function registerPrefixes()
         local result2 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.HeaderPrefix .. i);
         local result3 = C_ChatInfo.RegisterAddonMessagePrefix(DialUpComms.ResponsePrefix .. i);
         if result3 == Enum.RegisterAddonMessagePrefixResult.MaxPrefixes then
-            --print(DialUpComms, 'bailed early when registering prefixes', i - 1, prefixesToRegister);
+            debugPrint('Bailed early when registering prefixes', i - 1, prefixesToRegister);
             prefixesToRegister = i - 3;
             break;
         end;
     end;
     DialUpComms.prefixCount = prefixesToRegister;
+    debugPrint('Registered', prefixesToRegister, 'prefixes');
 end;
 
 
@@ -233,8 +240,14 @@ local function onEvent(self, event, prefix, message, channel, sender)
             DialUpComms.UpdateQueueState(queueType);
         end;
     elseif 'ADDON_RESTRICTION_STATE_CHANGED' then
-        DialUpComms.ChatIsRestricted = C_ChatInfo.InChatMessagingLockdown();
-        if DialUpComms.ChatIsRestricted then return; end;
+        local newState = C_ChatInfo.InChatMessagingLockdown();
+        if DialUpComms.ChatIsRestricted == newState then return; end;
+        DialUpComms.ChatIsRestricted = newState;
+        if DialUpComms.ChatIsRestricted then
+            debugPrint('Chat restriction is now enforced');
+            return;
+        end;
+        debugPrint('Chat restriction is now cleared');
         for queueType in pairs(DialUpComms.commLimits) do
             DialUpComms.UpdateQueueState(queueType);
         end;
@@ -297,14 +310,13 @@ function DialUpComms.AddNewPart(ID, partNumber, message)
     end;
     DialUpComms.SendResponsePacket(pack);
 
-    local incomingQueueCount = 0;
-    for i, _ in pairs(DialUpComms.IncomingPackages) do
-        incomingQueueCount = incomingQueueCount + 1;
-    end;
     for i, func in ipairs(DialUpComms.internallyRegisteredPrefixes[pack.prefix]) do
         func(pack.prefix, fullMessage, pack.channel, pack.sender);
     end;
     DialUpComms.IncomingPackages[ID] = nil;
+    if pack.parts > 1 then
+        debugPrint('Packet from', pack.sender, 'channel', pack.channel, 'completed.');
+    end;
 end;
 
 function DialUpComms.PrepIncomingPackage(prefix, parts, ID, sender, channel)
@@ -333,9 +345,11 @@ function DialUpComms.PrepIncomingPackage(prefix, parts, ID, sender, channel)
                 if pack.retriesLeft < 1 then
                     pack.retryTicker:Cancel();
                 end;
+                debugPrint('Requesting missing piece from', sender, 'channel', channel, 'retries left', pack.retriesLeft);
                 DialUpComms.SendResponsePacket(pack);
             end
         );
+    debugPrint('Incoming multi part packet from', sender, 'channel', channel, 'parts', parts, 'prefix', prefix);
 end;
 
 function DialUpComms.getGlobalCDForChannel(channel)
@@ -357,7 +371,6 @@ end;
 
 function DialUpComms.canSendMessageInChannel(channel)
     if not DialUpComms.AddonCommsCurrentlyAllowed() then return false; end;
-    if not DialUpComms.CommsAreHooked then return false; end;
     local cd = DialUpComms.getGlobalCDForChannel(channel);
     local globalCD = DialUpComms.getGlobalCD();
     local now = GetTime();
@@ -392,18 +405,33 @@ function DialUpComms.getMaxMessageLengthForChannel(channel)
 end;
 
 function DialUpComms.SendMessageInternal(incomingPrefix, message, channel, target, callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend)
-    local prefix
+    local prefix;
     if not DialUpComms.isHeaderOrResponsePrefix(incomingPrefix) then
         prefix = DialUpComms.Prefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     else
         prefix = incomingPrefix .. DialUpComms.getNextPrefixIndexForChannel(channel);
     end;
+    --debugPrint('Sending message with internal prefix', incomingPrefix, 'real prefix:', prefix, 'channel', channel,channel == "WHISPER" and target or "");
     local response = C_ChatInfo.SendAddonMessage(prefix, message, channel, target);
     if response ~= Enum.SendAddonMessageResult.Success then
-        if response == Enum.SendAddonMessageResult.GeneralError then --retry asap
-            DialUpComms:SendOrQueueMessage(incomingPrefix, message, channel, target, 'URGENT', callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
+        debugPrint('Sending Comm FAILED. Response:', response, 'channel', channel);
+
+        --these should never happen
+        assert(response ~= Enum.SendAddonMessageResult.InvalidChatType);
+        assert(response ~= Enum.SendAddonMessageResult.InvalidChannel);
+        assert(response ~= Enum.SendAddonMessageResult.InvalidMessage);
+        assert(response ~= Enum.SendAddonMessageResult.InvalidPrefix);
+
+        if response == Enum.SendAddonMessageResult.TargetOffline or
+        response == Enum.SendAddonMessageResult.NotInGroup or
+        response == Enum.SendAddonMessageResult.TargetRequired or
+        response == Enum.SendAddonMessageResult.NotInGuild then
+            return;
         end;
-        --print('response: ', response);
+
+        --retry asap
+        debugPrint('Requeue message due to failure', incomingPrefix, channel, target and target or '');
+        DialUpComms:SendOrQueueMessage(incomingPrefix, message, channel, target, 'URGENT', callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend);
         return;
     end;
     if callbackFunction then
@@ -430,16 +458,24 @@ function DialUpComms.UpdateQueueState(channel)
 end;
 
 function DialUpComms.ScheduleUpdate(channel)
-    if not DialUpComms.AddonCommsCurrentlyAllowed() then return false; end;
-    if not DialUpComms.CommsAreHooked then return false; end;
-    if DialUpComms.timers[channel] then return; end;
+    if not DialUpComms.AddonCommsCurrentlyAllowed() then
+        debugPrint('Did not schedule update due to chat restriction', channel);
+        return false;
+    end;
+    if DialUpComms.timers[channel] then
+        debugPrint('Did not schedule update due to timer already existing. Channel', channel);
+        return false;
+    end;
+
+
     local channelAvailableTime = math.max(DialUpComms.getGlobalCDForChannel(channel), DialUpComms.getGlobalCD());
     local now = GetTime();
-    local timeUntilAvailable = channelAvailableTime - now;
+    local timeUntilAvailable = ceil(channelAvailableTime - now) + 0.1; --offseting this check by 0.1 ensures we're not getting floating point issues
     DialUpComms.timers[channel] = C_Timer.NewTimer(timeUntilAvailable, function()
         DialUpComms.timers[channel] = nil;
         DialUpComms.UpdateQueueState(channel);
     end);
+    debugPrint('Scheduled update happening in', timeUntilAvailable, 'seconds', 'channel', channel);
 end;
 
 function DialUpComms:QueueMessage(prefix, message, channel, target, priority, callbackFunction, callbackArgument, bytesSent, totalAmountOfBytesToSend)
@@ -455,6 +491,7 @@ function DialUpComms:QueueMessage(prefix, message, channel, target, priority, ca
         bytesSent = bytesSent,
         totalAmountOfBytesToSend = totalAmountOfBytesToSend,
     };
+    debugPrint('Queueing message for prefix', prefix, 'prio', priority, 'channel', channel, '. Current queue length', #queue);
     DialUpComms.ScheduleUpdate(channelQueue);
 end;
 
@@ -490,9 +527,22 @@ function DialUpComms.CanSendToTargetViaBNET(target)
     end;
 end;
 
+---comment
+---@param prefix string
+---@param message string
+---@param channel "WHISPER"| "GUILD" | "BNET" | "INSTANCE_CHAT" | "RAID" | "PARTY"
+---@param target string?
+---@param priority "ALERT" | "NORMAL" |  'BULK' | nil
+---@param callbackFunction function | nil
+---@param callbackArgument any
+---@param statusCallback function | nil
 function DialUpComms:SendCommMessage(prefix, message, channel, target, priority, callbackFunction, callbackArgument, statusCallback)
     assert(prefix, 'Prefix Missing');
     assert(message, 'Message Missing');
+    assert(channel, 'Channel Missing');
+    if statusCallback and type(statusCallback) ~= 'function' then
+        error('statusCallback is not a function');
+    end;
     if callbackFunction and type(callbackFunction) ~= 'function' then
         error('callbackFunction is not a function');
     end;
@@ -532,7 +582,7 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
 
     local headerPrio = parts == 1 and priority or 'ALERT';
 
-
+    debugPrint('Outgoing message via prefix', prefix, 'length:', totalMessageLength, 'parts:', parts);
 
     local headerMessage = string.format('%s%s%s:%s', messageID, partsEncoded, prefix, partToSendWithHeader);
     DialUpComms:SendOrQueueMessage(DialUpComms.HeaderPrefix, headerMessage, channel, target, headerPrio, callbackFunction, callbackArgument, bytesSent, totalMessageLength);
@@ -555,7 +605,10 @@ function DialUpComms:SendCommMessage(prefix, message, channel, target, priority,
     C_Timer.After(
         DialUpComms.RetryInerval * (DialUpComms.Retries + 1),
         function()
-            DialUpComms.OutgoingPackages[messageID] = nil;
+            if DialUpComms.OutgoingPackages[messageID] then
+                DialUpComms.OutgoingPackages[messageID] = nil;
+                debugPrint('Clearing', messageID, 'due to timeout');
+            end;
         end
     );
 
@@ -651,6 +704,7 @@ function DialUpComms.GenerateUniqueID()
 end;
 
 function DialUpComms.AddonCommsCurrentlyAllowed()
+    if not DialUpComms.CommsAreHooked then return false; end;
     return not DialUpComms.ChatIsRestricted;
 end;
 
