@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 5;
+local MINOR = 6;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -470,7 +470,7 @@ function DialUpComms.ScheduleUpdate(channel)
 
     local channelAvailableTime = math.max(DialUpComms.getGlobalCDForChannel(channel), DialUpComms.getGlobalCD());
     local now = GetTime();
-    local timeUntilAvailable = ceil(channelAvailableTime - now) + 0.1; --offseting this check by 0.1 ensures we're not getting floating point issues
+    local timeUntilAvailable = (channelAvailableTime - now);
     DialUpComms.timers[channel] = C_Timer.NewTimer(timeUntilAvailable, function()
         DialUpComms.timers[channel] = nil;
         DialUpComms.UpdateQueueState(channel);
