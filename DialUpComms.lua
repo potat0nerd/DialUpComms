@@ -26,12 +26,12 @@ DialUpComms.Retries = 5;
 DialUpComms.RetryInerval = 120;
 
 
-DialUpComms.GlobalCommLimit = {budget = 100, reset = 5,};
+DialUpComms.GlobalCommLimit = {budget = 60, reset = 5,};
 
 DialUpComms.commLimits = {
     ['GUILD'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
-    ['WHISPER'] = {total = {budget = 90, reset = 5,}, messageLength = 255,},
-    ['BNET'] = {total = {budget = 100, reset = 5,}, messageLength = 4090,},
+    ['WHISPER'] = {total = {budget = 60, reset = 5,}, messageLength = 255,},
+    ['BNET'] = {total = {budget = 60, reset = 5,}, messageLength = 4090,},
     ['GROUP'] = {prefix = {budget = 10, reset = 10,}, total = {budget = 20, reset = 2,}, messageLength = 255,},
 };
 
@@ -43,7 +43,7 @@ DialUpComms.sharedLimits = {
 
 DialUpComms.ChatIsRestricted = false;
 
-DialUpComms.debug = false;
+DialUpComms.debug = true;
 
 local function debugPrint(...)
     if not DialUpComms.debug then return; end;
