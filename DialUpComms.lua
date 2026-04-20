@@ -43,7 +43,7 @@ DialUpComms.sharedLimits = {
 
 DialUpComms.ChatIsRestricted = false;
 
-DialUpComms.debug = true;
+DialUpComms.debug = false;
 
 local function debugPrint(...)
     if not DialUpComms.debug then return; end;
