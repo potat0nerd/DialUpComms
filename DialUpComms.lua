@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 6;
+local MINOR = 7;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
