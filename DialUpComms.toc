@@ -1,7 +1,7 @@
-## Interface: 120000
+## Interface: 120100
 ## Title: DialUpComms
 ## Notes: Yet another Comms lib
-## Author: Tato
+## Author: Potat0nerd
 ## Version: 1.0.0
 
 DialUpComms.xml
