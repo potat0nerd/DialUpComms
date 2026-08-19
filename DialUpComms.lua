@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 8;
+local MINOR = 9;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -516,7 +516,7 @@ function DialUpComms.SendMessageInternal(incomingPrefix, message, channel, targe
         assert(response ~= Enum.SendAddonMessageResult.InvalidPrefix, 'InvalidPrefix');
         assert(response ~= Enum.SendAddonMessageResult.TargetRequired, 'TargetRequired');
         assert(response ~= Enum.SendAddonMessageResult.AddonMessageThrottle, 'AddonMessageThrottle');
-        assert(response ~= Enum.SendAddonMessageResult.AddOnMessageLockdown, 'AddOnMessageLockdown');
+        --assert(response ~= Enum.SendAddonMessageResult.AddOnMessageLockdown, 'AddOnMessageLockdown');
         assert(response ~= Enum.SendAddonMessageResult.ChannelThrottle, 'ChannelThrottle');
 
         if channel == 'BNET' then --don't bother with bnet again
