@@ -1,5 +1,5 @@
 local MAJOR = 'DialUpComms';
-local MINOR = 9;
+local MINOR = 10;
 
 local DialUpComms = LibStub:NewLibrary(MAJOR, MINOR);
 if not DialUpComms then return; end;
@@ -637,7 +637,7 @@ local function getBNETInfoForTarget(target)
         end;
     end;
 
-    local myRealm = GetNormalizedRealmName();
+    local myRealm = GetNormalizedRealmName() or '';
     for friendIndex = 0, BNGetNumFriends() do
         local accIndexes = C_BattleNet.GetFriendNumGameAccounts(friendIndex);
         for accountIndex = 1, accIndexes do
@@ -706,9 +706,9 @@ end;
 function DialUpComms:SendCommMessage(prefix, message, channel, target, priority, callbackFunction, callbackArgument, statusCallback)
     priority = priority or 'NORMAL';
 
-    if channel == 'WHISPER' and DialUpComms.CanSendToTargetViaBNET(target) then
-        --channel = 'BNET';
-    end;
+    --if channel == 'WHISPER' and DialUpComms.CanSendToTargetViaBNET(target) then
+    --channel = 'BNET';
+    --end;
 
     local messageID = DialUpComms.GenerateUniqueID();
     local totalMessageLength = #message;
